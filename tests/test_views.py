@@ -73,7 +73,7 @@ class TestFunctionViews:
 
     def test_marshal_with_apply(self, app, client, models, schemas):
         @app.route('/')
-        @marshal_with(schemas.BandSchema,                 apply=lambda req, res: res.status_code == 200)
+        @marshal_with(schemas.BandSchema, apply=lambda req, res: res.status_code == 200)
         @marshal_with(schemas.BandSchema(only=('name',)), apply=lambda req, res: res.status_code == 201)
         def view():
             return models.Band('queen', 'rock'), 201
