@@ -72,10 +72,7 @@ def marshal_with(schema, code='default', description='', inherit=None, apply=Non
         others = func.__apispec__.get('schemas', [])[1:]
         has_callables = any(utils.is_callable(a.apply) for a in others)
         if utils.is_callable(apply):
-            print 'others:', [a.apply for a in func.__apispec__.get('schemas', [])]
             assert has_callables or not others, 'uh oh'
-        # if utils.is_callable(apply):
-        #     assert has_callable
         if has_callables and not utils.is_callable(apply):
             that = func.__apispec__['schemas'][0]
             if not that.apply:  # check for False
