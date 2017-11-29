@@ -5,7 +5,7 @@ import json
 from flask import make_response
 from marshmallow import fields, Schema
 
-from flask_apispec.utils import Ref
+from flask_apispec.utils import Ref, match_status_code
 from flask_apispec.views import MethodResource
 from flask_apispec import doc, use_kwargs, marshal_with
 
@@ -70,6 +70,123 @@ class TestFunctionViews:
             return models.Band('queen', 'rock'), 201
         res = client.get('/')
         assert res.json == {'name': 'queen'}
+
+    def test_marshal_with_apply(self, app, client, models, schemas):
+        @app.route('/')
+        @marshal_with(schemas.BandSchema,                 apply=lambda req, res: res.status_code == 200)
+        @marshal_with(schemas.BandSchema(only=('name',)), apply=lambda req, res: res.status_code == 201)
+        def view():
+            return models.Band('queen', 'rock'), 201
+        res = client.get('/')
+        assert res.json == {'name': 'queen'}
+
+    def test_marshal_with_apply_alternative(self, app, client, models, schemas):
+        @app.route('/')
+        @marshal_with(schemas.BandSchema(only=('genre',)), apply=lambda req, res: res.status_code == 200)
+        @marshal_with(schemas.BandSchema(only=('name',)), apply=lambda req, res: res.status_code == 201)
+        def view():
+            return models.Band('queen', 'rock'), 200
+        res = client.get('/')
+        assert res.json == {'genre': 'rock'}
+
+    def test_marshal_with_apply_default(self, app, client, models, schemas):
+        @app.route('/')
+        @marshal_with(schemas.BandSchema(only=('genre', )), apply=lambda req, res: res.status_code == 200)
+        @marshal_with(schemas.BandSchema(only=('name', )), apply=lambda req, res: res.status_code == 201)
+        def view():
+            return models.Band('queen', 'rock')
+        res = client.get('/')
+        assert res.json == {'genre': 'rock'}
+
+    def test_marshal_with_apply_via_headers(self, app, client, models, schemas):
+        import re
+        pattern = r'application/vnd\.(?P<vendor_id>\w+)(\.(\w+))*\.v(?P<version_number>\d+)(\+\w+)?'
+        compiled = re.compile(pattern)
+        def _get_version(mimetype):
+            m = compiled.match(mimetype)
+            if m and m.group("version_number"):
+                return int(m.group("version_number"))
+        def is_v5(req):
+            for mt in req.accept_mimetypes.values():
+                v = _get_version(mt)
+                if v == 5:
+                    return True
+            return False
+
+        @app.route('/')
+        @marshal_with(schemas.BandSchema, code = 200, apply=lambda req, res: is_v5(req))
+        @marshal_with(schemas.BandSchema(only=('name',)), code = 200, apply=lambda req, res: res.status_code == 200)
+        def view():
+            return models.Band('queen', 'rock')
+        res = client.get('/', headers = {'Accept': 'application/vnd.company.v5'})
+        assert res.json == {'name': 'queen', 'genre': 'rock'}
+
+    def test_marshal_with_apply_via_headers_fallthru(self, app, client, models, schemas):
+        def is_v5(req):
+            return False
+        @app.route('/')
+        @marshal_with(schemas.BandSchema, code = 200, apply=lambda req, res: is_v5(req))
+        @marshal_with(schemas.BandSchema(only=('name',)), code = 200, apply=lambda req, res: res.status_code == 200)
+        def view():
+            return models.Band('queen', 'rock')
+        res = client.get('/')
+        assert res.json == {'name': 'queen'}
+
+    def test_marshal_with_apply_via_headers_fallthru_2(self, app, client, models, schemas):
+        def is_v5(req):
+            return False
+        @app.route('/')
+        @marshal_with(schemas.BandSchema, code = 200, apply=lambda req, res: is_v5(req))
+        @marshal_with(schemas.BandSchema(only=('name',)), code = 200, apply=match_status_code(200))
+        def view():
+            return models.Band('queen', 'rock')
+        res = client.get('/')
+        assert res.json == {'name': 'queen'}
+
+    def test_marshal_with_apply_via_headers_fallthru_3(self, app, client, models, schemas):
+        def is_v5(req):
+            return False
+        @app.route('/')
+        @marshal_with(schemas.BandSchema(only=('name',)), code = 200)
+        @marshal_with(schemas.BandSchema, code = 200, apply=lambda req, res: is_v5(req))
+        def view():
+            return models.Band('queen', 'rock')
+        res = client.get('/')
+        assert res.json == {'name': 'queen'}
+
+    def test_marshal_with_apply_via_headers_fallthru_4(self, app, client, models, schemas):
+        def is_v5(req):
+            return False
+        @app.route('/')
+        @marshal_with(schemas.BandSchema(only=('name',)), code = 200)
+        @marshal_with(schemas.BandSchema, code = 200, apply=lambda req, res: is_v5(req))
+        def view():
+            return models.Band('queen', 'rock')
+        res = client.get('/')
+        assert res.json == {'name': 'queen'}
+
+    def test_marshal_with_apply_via_headers_fallthru_5(self, app, client, models, schemas):
+        def is_v5(req):
+            return False
+        @app.route('/')
+        @marshal_with(schemas.BandSchema(only=('name',)))
+        @marshal_with(schemas.BandSchema, code = 200, apply=lambda req, res: is_v5(req))
+        def view():
+            return models.Band('queen', 'rock')
+        res = client.get('/')
+        assert res.json == {'name': 'queen'}
+
+    def test_marshal_with_apply_via_headers_fallthru_6(self, app, client, models, schemas):
+        def is_v5(req):
+            return False
+        @app.route('/')
+        @marshal_with(schemas.BandSchema(only=('genre',)), code = 201)
+        @marshal_with(schemas.BandSchema(only=('name',)), code = 200)
+        @marshal_with(schemas.BandSchema, apply=lambda req, res: is_v5(req))
+        def view():
+            return models.Band('queen', 'rock'), 201
+        res = client.get('/')
+        assert res.json == {'genre': 'rock'}
 
     def test_integration(self, app, client, models, schemas):
         @app.route('/')
