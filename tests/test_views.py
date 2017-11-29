@@ -170,7 +170,7 @@ class TestFunctionViews:
             return False
         @app.route('/')
         @marshal_with(schemas.BandSchema(only=('name',)))
-        @marshal_with(schemas.BandSchema, code = 200, apply=lambda req, res: is_v5(req))
+        @marshal_with(schemas.BandSchema, code = '200 - v1', apply=lambda req, res: is_v5(req))
         def view():
             return models.Band('queen', 'rock')
         res = client.get('/')

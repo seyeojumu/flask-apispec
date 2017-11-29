@@ -51,7 +51,6 @@ class Annotation(object):
         assert new_apply, 'clearing apply not supported'
         for opt in self.options:
             opt['_apply'] = new_apply
-        self.apply = new_apply
 
     def __eq__(self, other):
         if isinstance(other, Annotation):

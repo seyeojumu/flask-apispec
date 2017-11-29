@@ -81,7 +81,9 @@ class Converter(object):
 
     def get_responses(self, view, parent=None):
         annotation = resolve_annotations(view, 'schemas', parent)
-        return merge_recursive(annotation.options)
+        result = dict(merge_recursive(annotation.options))
+        result.pop('_apply', None)
+        return result
 
 class ViewConverter(Converter):
 
