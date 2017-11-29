@@ -136,6 +136,32 @@ class TestResourceView:
             spec.add_path(**path)
         return spec._paths['/bands/{band_id}/']
 
+    @pytest.fixture
+    def resource_view_2(self, app, models, schemas):
+        @doc(tags=['band'])
+        class BandResource(MethodResource):
+            @use_kwargs({'name': fields.Str()}, locations=('query', ))
+            @marshal_with(schemas.BandSchema, code = "200 - v1", description='a band')
+            @marshal_with(
+                schemas.BandSchema(only=('name',)),
+                code = "200 - v2",
+                description='a band (v2)',
+                apply = lambda req: False
+            )
+            def get(self, **kwargs):
+                return models.Band('slowdive', 'shoegaze')
+
+        app.add_url_rule('/bands/<band_id>/', view_func=BandResource.as_view('band'))
+        return BandResource
+
+    @pytest.fixture
+    def path_2(self, app, spec, resource_view_2):
+        converter = ResourceConverter(app)
+        paths = converter.convert(resource_view_2, endpoint='band')
+        for path in paths:
+            spec.add_path(**path)
+        return spec._paths['/bands/{band_id}/']
+
     def test_params(self, app, path):
         params = path['get']['parameters']
         rule = app.url_map._rules_by_endpoint['band'][0]
@@ -147,8 +173,15 @@ class TestResourceView:
 
     def test_responses(self, schemas, path):
         response = path['get']['responses']['default']
+        schema = schemas.BandSchema
         assert response['description'] == 'a band'
-        assert response['schema'] == swagger.schema2jsonschema(schemas.BandSchema)
+        assert response['schema'] == swagger.schema2jsonschema(schema)
+
+    def test_responses_2(self, schemas, path_2):
+        response = path_2['get']['responses']['200 - v2']
+        schema = schemas.BandSchema(only=('name',))
+        assert response['description'] == 'a band (v2)'
+        assert response['schema'] == swagger.schema2jsonschema(schema)
 
     def test_tags(self, path):
         assert path['get']['tags'] == ['band']

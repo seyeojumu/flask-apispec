@@ -32,12 +32,25 @@ def resolve_refs(obj, attr):
         return attr.resolve(obj)
     return attr
 
+def match_status_code(status_code):
+    def wrapped(req, res):
+        return res.status_code == status_code
+    return wrapped
+
 class Annotation(object):
 
     def __init__(self, options=None, inherit=None, apply=None):
         self.options = options or []
+        for opt in self.options:
+            if '_apply' not in opt and apply:  # is not False:
+                opt['_apply'] = apply
         self.inherit = inherit
         self.apply = apply
+
+    def set_apply(self, new_apply):
+        assert new_apply, 'clearing apply not supported'
+        for opt in self.options:
+            opt['_apply'] = new_apply
 
     def __eq__(self, other):
         if isinstance(other, Annotation):
@@ -67,6 +80,12 @@ class Annotation(object):
             inherit=other.inherit,
             apply=self.apply if self.apply is not None else other.apply,
         )
+
+def is_callable(thing):
+    try:
+        return callable(thing)
+    except NameError:
+        return hasattr(thing, '__call__')
 
 def resolve_annotations(func, key, parent=None):
     annotations = (

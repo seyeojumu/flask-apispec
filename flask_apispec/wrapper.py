@@ -9,6 +9,10 @@ from webargs import flaskparser
 
 from flask_apispec import utils
 
+from collections import namedtuple
+
+ResponseLike = namedtuple('ResponseLike', ('body', 'status_code', 'headers',))
+
 class Wrapper(object):
     """Apply annotations to a view function.
 
@@ -45,8 +49,18 @@ class Wrapper(object):
         config = flask.current_app.config
         format_response = config.get('APISPEC_FORMAT_RESPONSE', flask.jsonify) or identity
         annotation = utils.resolve_annotations(self.func, 'schemas', self.instance)
-        schemas = utils.merge_recursive(annotation.options)
-        schema = schemas.get(status_code, schemas.get('default'))
+        if utils.is_callable(annotation.apply):
+            req = flaskparser.parser.get_default_request()
+            res = ResponseLike(unpacked[0], status_code, unpacked[2])
+            for schemas in annotation.options:
+                fn = schemas.get('_apply', lambda x: True)
+                if fn(req, res):
+                    schema = schemas.get(status_code, schemas.get('default'))
+                    break
+        else:
+            schemas = utils.merge_recursive(annotation.options)
+            schema = schemas.get(status_code, schemas.get('default'))
+
         if schema and annotation.apply is not False:
             schema = utils.resolve_instance(schema['schema'])
             output = schema.dump(unpacked[0]).data
